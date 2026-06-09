@@ -28,7 +28,7 @@ get_INSITU-LANDSAT-PAIRS.py
 ```
 Reads EasyCORA in-situ NetCDF files, filters to near-surface observations (≤3 m depth), and submits batched export tasks to Google Earth Engine to match each observation to the nearest Landsat scene (±3 h, 100 m spatial buffer). Results export as CSVs to Google Drive and are synced locally to `data/GEE_validation_files/`. Processing state is saved to a JSON file so the script can be safely restarted without re-submitting completed tasks.
 
-**4. Derive SST coefficients and validate** ✓ *runs locally — ~1 hour, 8 GB RAM*
+**4. Derive SST coefficients and validate** ✓ *runs locally — <1 hour*
 ```
 derive_SST-COEFFS-main.py
 ```
@@ -74,7 +74,7 @@ The libRadtran simulation results and matched in-situ validation data are deposi
 
 ## Large data files
 
-The following are excluded from version control. The libRadtran simulations and matched validation data are available from Zenodo (see above). The MERRA-2 profiles must be re-downloaded from NASA.
+The following are excluded from version control. The libRadtran simulations and matched validation data are available from Zenodo (10.5281/zenodo.20607850). The MERRA-2 profiles must be re-downloaded from NASA.
 
 | Directory | Contents | Source |
 |-----------|----------|--------|
