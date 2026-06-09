@@ -1,0 +1,22 @@
+# large data files 
+*.nc
+*.sh
+data/GEE_validation_files/*
+data/libradtran_sims/*
+data/MERRA_2_atmos_profiles/*
+
+# preserve empty directory stubs for cloners
+!data/GEE_validation_files/.gitkeep
+!data/libradtran_sims/.gitkeep
+!data/MERRA_2_atmos_profiles/.gitkeep
+
+# logs
+logs/*
+!logs/.gitkeep
+
+# archive / working notes
+ARCHIVE/
+randomseed
+
+# cache files
+data/MERRA_2_sampling/merra2_data_cache.pkl
