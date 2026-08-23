@@ -49,8 +49,8 @@ The libRadtran simulation results and matched in-situ validation data are deposi
 │   ├── run_LIBRADTRAN-SIMS.py                  # step 2
 │   ├── get_INSITU-LANDSAT-PAIRS.py             # step 3
 │   ├── derive_SST-COEFFS-main.py               # step 4
-│   ├── plot_MERRA2_sampling.py             # utility: visualise merra2 sampling
-│   └── plot_outlier_analysis.py            # utility: outlier diagnostics
+│   ├── plot_MERRA2_sampling.py            
+│   └── plot_outlier_analysis.py            
 │
 ├── data/
 │   ├── algorithm_params/            # Algorithm outputs
