@@ -2,8 +2,6 @@
 
 Code for retrieving sea surface temperature from Landsat 4/5/7/8/9 thermal imagery over Arctic coastal waters. The algorithm is trained on libRadtran radiative transfer simulations with by MERRA-2 atmospheric profiles, and validated against EasyCORA in-situ observations (CMEMS).
 
-PublIn review in: *[Journal of Glaciology, in revision]*
-
 ---
 
 ## Pipeline
@@ -14,19 +12,19 @@ Scripts are in `code/` and run in order:
 ```
 get_MERRA2-PROFILES_1985-2025.py
 ```
-Downloads MERRA-2 reanalysis profiles (temperature, relative humidity) for a grid of Arctic coastal ocean sampling points spanning 1985–2025. Output goes to `data/MERRA_2_atmos_profiles/`. Sampling point locations are in `data/MERRA_2_sampling/`. Runtime is dominated by NASA GESDISC server throughput.
+Downloads MERRA-2 reanalysis profiles (temperature, relative humidity) for a grid of Greenland coastal ocean sampling points spanning 1985–2025. Output goes to `data/MERRA_2_atmos_profiles/`. Sampling point locations are in `data/MERRA_2_sampling/`. 
 
-**2. Run libRadtran radiative transfer simulations**  *run on HPC — ~12 hours*
+**2. Run libRadtran radiative transfer simulations**  *run on HPC — 6 hours*
 ```
 run_LIBRADTRAN-SIMS.py - requires download of libradtran v2.0.6 (http://www.libradtran.org/) 
 ```
-Runs libRadtran for each MERRA-2 profile to simulate Landsat brightness temperatures across the range of Arctic SST and atmospheric conditions. Outputs `.inp`/`.out` files and a compiled results CSV (`data/libradtran_sims/libradtran_simulations_df_MERRA.csv`). Landsat spectral response functions are in `data/libradtran/landsat-spectral-info/`.
+Runs libRadtran for each MERRA-2 profile to simulate Landsat brightness temperatures across the range of Arctic SST and atmospheric conditions. Outputs `.inp`/`.out` files and a compiled results CSV (`data/libradtran_sims/libradtran_simulations_df_MERRA.csv`). Landsat spectral response functions are in `data/libradtran/landsat-spectral-info/` from USGS handbook
 
-**3. Match in-situ observations to Landsat scenes (GEE)**  *run on HPC — several hours*
+**3. Match in-situ observations to Landsat scenes (GEE)**  *run on HPC ~weeks*
 ```
 get_INSITU-LANDSAT-PAIRS.py
 ```
-Reads EasyCORA in-situ NetCDF files, filters to near-surface observations (≤3 m depth), and submits batched export tasks to Google Earth Engine to match each observation to the nearest Landsat scene (±3 h, 100 m spatial buffer). Results export as CSVs to Google Drive and are synced locally to `data/GEE_validation_files/`. Processing state is saved to a JSON file so the script can be safely restarted without re-submitting completed tasks.
+Reads EasyCORA in-situ NetCDF files, filters to near-surface observations (≤3 m depth), and submits batched export tasks to Google Earth Engine to match each observation to the nearest Landsat scene (±3 h, 100 m spatial buffer). Results export as CSVs to Google Drive and are synced locally to `data/GEE_validation_files/`. Processing log is saved to a JSON file so the script can be restarted without re-submitting completed tasks.
 
 **4. Derive SST coefficients and validate** ✓ *runs locally — <1 hour*
 ```
@@ -38,7 +36,7 @@ Fits per-sensor regression coefficients (A, B, C) from the libRadtran simulation
 
 ## Reproducing the coefficient derivation
 
-The libRadtran simulation results and matched in-situ validation data are deposited on Zenodo (DOI: *[to be added]*), so the coefficient derivation (step 4) can be re-run without running the full pipeline. 
+The libRadtran simulation results and matched in-situ validation data are deposited on Zenodo (https://doi.org/10.5281/zenodo.20607850), so the coefficient derivation (step 4) can be re-run without running the full pipeline. 
 
 ---
 
@@ -62,19 +60,18 @@ The libRadtran simulation results and matched in-situ validation data are deposi
 │   │   └── landsat-spectral-info/   # Landsat SRF files
 │   ├── MERRA_2_sampling/            # Sampling point locations (shapefile + CSV)
 │   │
-│   ├── MERRA_2_atmos_profiles/      # [large — not tracked, see below]
-│   ├── libradtran_sims/             # [large — not tracked see Zenodo]
-│   └── GEE_validation_files/        # [large see Zenodo]
-│
+│   ├── MERRA_2_atmos_profiles/      
+│   ├── libradtran_sims/             
+│   └── GEE_validation_files/        
 ├── Figures/                         # Output plots
-└── logs/                            # SLURM and script logs # not tracked
+└── logs/                            # SLURM and script logs 
 ```
 
 ---
 
 ## Large data files
 
-The following are excluded from version control. The libRadtran simulations and matched validation data are available from Zenodo (10.5281/zenodo.20607850). The MERRA-2 profiles must be re-downloaded from NASA.
+The following are excluded from this repo. The libRadtran simulations and matched validation data are available from Zenodo ([10.5281/zenodo.20607850](https://doi.org/10.5281/zenodo.20607850)). The MERRA-2 profiles must be re-downloaded from NASA.
 
 | Directory | Contents | Source |
 |-----------|----------|--------|
@@ -89,11 +86,6 @@ The EasyCORA in-situ data must be downloaded separately from [CMEMS](https://mar
 ## Dependencies
 
 A conda environment file is provided at `environment.yml`. To create the environment:
-
-```bash
-conda env create -f environment.yml
-conda activate derive_landsat_sst
-```
 
 This installs all Python dependencies (Python 3.10, `earthengine-api`, `xarray`, `pandas`, `numpy`, `scikit-learn`, `matplotlib`, `cartopy`, `geopandas`, `tqdm`, and others). Additionally required:
 
