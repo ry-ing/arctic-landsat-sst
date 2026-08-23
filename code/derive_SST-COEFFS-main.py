@@ -4,9 +4,8 @@ Derives SST retreival coefficients (A, B, C, D) from libRadtran simulations
 and validates against EasyCORA in-situ matchups.
 
 Algorithm: SST = A·Tb_scaled + B·(Tb_scaled·TCWV_scaled) + C + D
-Tb and TCWV are independently RobustScaler-normalised before the interaction
-term is computed; D is derived
-via k-fold (5-fold) cross-validation (see https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.KFold.html)
+Tb and TCWV are independently RobustScaler-normalised (using scikit learn), D is derived
+via k-fold (5-fold) cross-validation (using scikit learn)
 """
 
 # import modules
@@ -70,14 +69,14 @@ SENSORS_TO_PROCESS = ['L4', 'L5', 'L7', 'L8', 'L9']
 SST_MIN_KELVIN = 272.0    # exclude likely sea-ice profiles from MERRA-2 (skin T tail below ~272 K)
 
 # --- Contamination filter ---
-BT_STDEV_THRESHOLD = 1.0  # K — max within-scene BT stdev
+BT_STDEV_THRESHOLD = 1.0  # K — max within-scene BT stdev to remove ice or cloud interference
 
 # --- Cross-validation settings for D ---
-CV_N_SPLITS  = 5          # number of k-fold splits
+CV_N_SPLITS  = 5          # number of k-fold splits (for deriving D)
 CV_N_SIGMA   = 1          # sigma threshold for outlier removal within each calibration fold
 CV_RANDOM_STATE = 42
 
-# order of mag. format colourbar tick labels in validation scatter plot
+# order of mag. format colourbar tick labels in validation scatter plot (https://stackoverflow.com/questions/43324152/python-matplotlib-colorbar-scientific-notation-base)
 class OOMFormatter(mticker.ScalarFormatter):
     def __init__(self, order=0, fformat="%1.1f", offset=True, mathText=True):
         self.oom = order
@@ -137,7 +136,7 @@ def derive_coefficients(simulation_df: pd.DataFrame):
             logging.warning(f"  Skipping {sensor}: missing columns.")
             continue
 
-        # Feature columns for scaling (INDEPENDANT scalers)
+        # Feature columns for scaling
         feature_cols = [bt_col, tcwv_col]
         df_s = pd.concat([y, simulation_df[feature_cols]], axis=1).dropna()
         if df_s.empty:
@@ -151,12 +150,11 @@ def derive_coefficients(simulation_df: pd.DataFrame):
         X_scaled = scaler.fit_transform(X_s.values)
         scalers[sensor] = scaler
 
-        # Create interaction term: Tb_scaled * TCWV_scaled
         tb_scaled = X_scaled[:, 0]
         tcwv_scaled = X_scaled[:, 1]
         interaction = tb_scaled * tcwv_scaled
 
-        # Fit model with 3 features: Tb_scaled, interaction, intercept
+        # Fit model with 3 features: Tb_scaled, tcwv/tb_scaled (interaction term), intercept
         X_model = np.column_stack([tb_scaled, interaction])
         model = LinearRegression().fit(X_model, y_s)
         
@@ -227,7 +225,7 @@ def validate_coefficients(validation_dir: Path,
             if "ERA5_wind_speed" in df.columns:
                 df['ERA5_wind_speed'] = pd.to_numeric(df['ERA5_wind_speed'], errors='coerce')
                 df = df[df['ERA5_wind_speed'] >= 6.0]
-            df = df[~df['TYPE'].isin(['FB', 'CT'])] # filter out ferrboxes and ctd files (should already be excluded in validation)
+            df = df[~df['TYPE'].isin(['FB', 'CT'])] # filter out ferrboxes and ctd files (should already be excluded in GEE validation)
             if "pixel_count" in df.columns:
                 df = df[df['pixel_count'].astype(float) > 5] # must have at least 5 pixels (100 m buffer at 30 m res = 9 pixels)
 
@@ -243,7 +241,7 @@ def validate_coefficients(validation_dir: Path,
             if not df.empty:
                 df_list.append(df)
         except pd.errors.EmptyDataError:
-            # Empty CSV — GEE batch had no Landsat matches, expected
+            # Empty CSV — GEE batch had no Landsat matches
             continue
         except Exception as e:
             logging.warning(f"Could not load {f}: {e}")
@@ -395,7 +393,6 @@ def calculate_bias_kfold(val_df: pd.DataFrame):
                 )
 
             # D corrects the raw retrieval to match in-situ:
-            # raw_SST + D ≈ insitu_SST  =>  D = mean(insitu - raw) on cal fold
             D_fold = float((df_cal[cal_mask]['insitu_SST'] -
                             df_cal[cal_mask]['raw_SST_C']).mean())
             D_per_fold.append(D_fold)
@@ -559,14 +556,14 @@ def _draw_scatter_with_marginals(ax, df_sensor, orig_data,
         df_inliers  = df_sensor
         df_outliers = df_sensor.iloc[:0]   # empty
 
-    # Layer 1: all-data background (very light grey — context only)
+    # Layer 1: all-data background (GREY, slightly transparent)
     sns.scatterplot(data=orig_data, x='insitu_SST', y='adjusted_landsat_SST',
                     color='grey', alpha=0.15, ax=ax, legend=False)
-    # Layer 2: test-fold outliers (medium grey — visible but not prominent)
+  
     if not df_outliers.empty:
         ax.scatter(df_outliers['insitu_SST'], df_outliers['adjusted_landsat_SST'],
                    color='#888888', alpha=0.4, s=12, zorder=3, linewidths=0)
-    # Layer 3: test-fold inliers (KDE density coloured)
+    # Layer 3 -  test-fold inliers (KDE density coloured)
     sns.scatterplot(data=df_inliers, x='insitu_SST', y='adjusted_landsat_SST',
                     hue='density', palette='YlGnBu_r', alpha=0.6, ax=ax, legend=False,
                     hue_norm=(density_min, density_max))
@@ -576,7 +573,7 @@ def _draw_scatter_with_marginals(ax, df_sensor, orig_data,
     ax.set_ylabel('')
     ax.set_xlabel('')
 
-    # Marginal histograms — inliers only
+    # Marginal histograms for inliers only
     ax_histx = ax.inset_axes([0, 1, 1, 0.15], sharex=ax)
     ax_histy = ax.inset_axes([1, 0, 0.15, 1], sharey=ax)
 
@@ -967,7 +964,7 @@ def main():
     # 1. Load simulation results
     try:
         simulation_df = pd.read_csv(SIMULATION_RESULTS_CSV)
-        # Backwards-compatable rename for era5 → merra2 column names
+        # Backwards-compatable rename for era5 to merra2 column names (from previous trial with ERA data - no longer used)
         simulation_df = simulation_df.rename(columns={
             'sst_skin_era5_k':  'sst_skin_merra2_k',
             'tcwv_era5_kg_m2':  'tcwv_merra2_kg_m2',
